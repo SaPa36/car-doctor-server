@@ -31,6 +31,7 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
         const servicesCollection = client.db('carDoctorDB').collection('services');
+        const bookingsCollection = client.db('carDoctorDB').collection('bookings');
 
         app.get('/services', async (req, res) => {
             
@@ -47,6 +48,15 @@ async function run() {
                 projection: { title: 1, price: 1, service_id: 1, img: 1 },
             }
             const result = await servicesCollection.findOne(query, options);
+            res.send(result);
+        });
+
+
+        // Bookings API
+        app.post('/bookings', async (req, res) => {
+            const booking = req.body;
+            console.log(booking);
+            const result = await bookingsCollection.insertOne(booking);
             res.send(result);
         });
         // Send a ping to confirm a successful connection
