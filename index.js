@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
@@ -10,8 +11,12 @@ const port = process.env.PORT || 5000;
 
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:5173'],
+    credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
 
 
 
@@ -27,6 +32,23 @@ const client = new MongoClient(uri, {
     }
 });
 
+const verifyJWT = (req, res, next) => {
+    // Read the token from cookies instead of headers
+    const token = req.cookies?.token; 
+    
+    if (!token) {
+        return res.status(401).send({ error: true, message: 'unauthorized access' });
+    }
+
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(403).send({ error: true, message: 'unauthorized access' });
+        }
+        req.decoded = decoded;
+        next();
+    });
+}
+
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
@@ -38,13 +60,23 @@ async function run() {
         app.post('/jwt', async (req, res) => {
             const user = req.body;
             console.log(user);
-            const token = jwt.sign(user, 'secret', { expiresIn: '1h' });
-            res.send({ token });
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+
+            //console.log('JWT TOKEN:', token);
+
+            res
+                .cookie('token', token, {
+                    httpOnly: true,
+                    secure: false,
+                    sameSite: 'lax',
+
+                })
+                .send({ success: true, token });
         });
 
         // Services API
         app.get('/services', async (req, res) => {
-            
+
             const cursor = servicesCollection.find();
             const result = await cursor.toArray();
             res.send(result);
@@ -54,7 +86,7 @@ async function run() {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
 
-            const options ={
+            const options = {
                 projection: { title: 1, price: 1, service_id: 1, img: 1 },
             }
             const result = await servicesCollection.findOne(query, options);
@@ -63,10 +95,13 @@ async function run() {
 
 
         // Bookings API
-        app.get('/bookings', async (req, res) => {
+        app.get('/bookings', verifyJWT,  async (req, res) => {
+            console.log(req.query.email);
+            //console.log(req.cookies.token); 
+            console.log('token owner info', req.decoded);
             let query = {};
-            if(req.query?.email){
-                query = {email: req.query.email}
+            if (req.query?.email) {
+                query = { email: req.query.email }
             }
             const result = await bookingsCollection.find(query).toArray();
             res.send(result);
