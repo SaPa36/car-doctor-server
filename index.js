@@ -1,8 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
@@ -12,7 +13,9 @@ const port = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-    origin: ['http://localhost:5173'],
+    origin: [
+        'http://localhost:5173'
+    ],
     credentials: true
 }));
 app.use(express.json());
@@ -67,11 +70,17 @@ async function run() {
             res
                 .cookie('token', token, {
                     httpOnly: true,
-                    secure: false,
-                    sameSite: 'lax',
+                    secure: true,
+                    sameSite: 'none',
 
                 })
                 .send({ success: true, token });
+        });
+
+        app.post('/logout', async (req, res) => {
+            const user = req.body;
+            console.log('Logout user:', user);
+            res.clearCookie('token', {maxAge: 0 }).send({ success: true, message: 'Logged out successfully' });
         });
 
         // Services API
@@ -97,7 +106,7 @@ async function run() {
         // Bookings API
         app.get('/bookings', verifyJWT,  async (req, res) => {
             console.log(req.query.email);
-            //console.log(req.cookies.token); 
+            console.log(req.cookies.token); 
             console.log('token owner info', req.decoded);
             let query = {};
             if (req.query?.email) {
@@ -109,7 +118,7 @@ async function run() {
 
         app.post('/bookings', async (req, res) => {
             const booking = req.body;
-            console.log(booking);
+            //console.log(booking);
             const result = await bookingsCollection.insertOne(booking);
             res.send(result);
         });
@@ -118,7 +127,7 @@ async function run() {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
             const updatedBooking = req.body;
-            console.log(updatedBooking);
+            //console.log(updatedBooking);
             const updateDoc = {
                 $set: {
                     status: updatedBooking.status
